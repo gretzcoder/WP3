@@ -3,11 +3,13 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Member extends CI_Controller
 {
-    function __construct() {
+    function __construct()
+    {
         parent::__construct();
     }
 
-    function index() {
+    function index()
+    {
         $this->_login();
     }
     private function _login()
@@ -25,7 +27,8 @@ class Member extends CI_Controller
                 if (password_verify($password, $user['password'])) {
                     $data = [
                         'email' => $user['email'],
-                        'role_id' => $user['role_id']
+                        'role_id' => $user['role_id'],
+                        'id' => $user['id']
                     ];
 
                     $this->session->set_userdata($data);
@@ -44,7 +47,8 @@ class Member extends CI_Controller
         }
     }
 
-    function daftar() {
+    function daftar()
+    {
         if ($this->session->userdata('email')) {
             redirect('user');
         }
@@ -98,89 +102,94 @@ class Member extends CI_Controller
         }
     }
 
-    function profile() {
-        $data['judul'] = 'Profil Saya'; 
-        $user = $this->ModelUser->cekData(['email' => $this->session->userdata('email')])->row_array(); 
-        foreach ($user as $a) { 
-        $data = [ 
-        'image' => $user['image'],
-        'user' => $user['nama'], 
-        'email' => $user['email'], 
-        'tanggal_input' => $user['tanggal_input'], 
-        ]; 
-        } 
-        $this->load->view('templates/templates-user/header', $data); 
-        $this->load->view('member/index', $data); 
-        $this->load->view('templates/templates-user/modal'); 
-        $this->load->view('templates/templates-user/footer', $data); 
+    function profile()
+    {
+        $data['judul'] = 'Profil Saya';
+        $user = $this->ModelUser->cekData(['email' => $this->session->userdata('email')])->row_array();
+        foreach ($user as $a) {
+            $data = [
+                'image' => $user['image'],
+                'user' => $user['nama'],
+                'email' => $user['email'],
+                'tanggal_input' => $user['tanggal_input'],
+            ];
+        }
+        $this->load->view('templates/templates-user/header', $data);
+        $this->load->view('member/index', $data);
+        $this->load->view('templates/templates-user/modal');
+        $this->load->view('templates/templates-user/footer', $data);
     }
 
-    function ubahProfil() {
+    function ubahProfil()
+    {
         $data['judul'] = "Ubah Profile";
         $user = $this->ModelUser->cekData(['email' => $this->session->userdata('email')])->row_array();
-        
-        foreach ($user as $a) { 
-            $data = [ 
-                'image' => $user['image'], 
-                'user' => $user['nama'], 
-                'email' => $user['email'], 
-                'tanggal_input' => $user['tanggal_input'], 
-            ]; 
+
+        if (!$user) {
+            show_error('User not found', 404);
+            return;
         }
+
+        $data = [
+            'image' => $user['image'],
+            'user' => $user['nama'],
+            'email' => $user['email'],
+            'tanggal_input' => $user['tanggal_input'],
+        ];
 
         $this->form_validation->set_rules('halo', 'Nama Lengkap', 'required|trim', ['required' => 'Nama tidak Boleh Kosong']);
 
         if ($this->form_validation->run() == false) {
-            $this->load->view('templates/templates-user/header', $data); 
-            $this->load->view('member/ubah-anggota', $data); 
-            $this->load->view('templates/templates-user/modal'); 
-            $this->load->view('templates/templates-user/footer', $data); 
-        } else{
+            $this->load->view('templates/templates-user/header', $data);
+            $this->load->view('member/ubah-anggota', $data);
+            $this->load->view('templates/templates-user/modal');
+            $this->load->view('templates/templates-user/footer', $data);
+        } else {
+            $upload_image = $_FILES['image']['name'];
+
+            if ($upload_image) {
+                $config['upload_path'] = './assets/img/profile/';
+                $config['allowed_types'] = 'gif|jpg|png|jpeg';
+                $config['max_size'] = '3000';
+                $config['max_width'] = '1024';
+                $config['max_height'] = '1000';
+                $config['file_name'] = 'pro_' . time(); // Changed to include underscore for readability
+                $this->load->library('upload', $config);
+
+                if (!$this->upload->do_upload('image')) {
+                    $error = $this->upload->display_errors();
+                    $this->session->set_flashdata('pesan', '<div class="alert alert-danger alert-message" role="alert">' . $error . '</div>');
+                    redirect('member/ubahProfil'); // Redirect back to the form
+                    // return;
+                } else {
+                    $gambar_lama = $user['image'];
+                    if ($gambar_lama != 'default.jpg') {
+                        @unlink(FCPATH . 'assets/img/profile/' . $gambar_lama); // Suppress errors with @
+                    }
+                    $gambar_baru = $this->upload->data('file_name');
+                    $this->db->set('image', $gambar_baru);
+                }
+            }
+
             $nama = $this->input->post('halo', true);
             $email = $this->input->post('email', true);
 
-            //jika ada gambar yang akan diupload
-            $upload_image = $_FILES['image']['name']; 
-            if (!$upload_image) { 
-            $config['upload_path'] = './assets/img/profile/'; 
-            $config['allowed_types'] = 'gif|jpg|png|jpeg'; 
-            $config['max_size'] = '3000'; 
-            $config['max_width'] = '1024'; 
-            $config['max_height'] = '1000'; 
-            $config['file_name'] = 'pro' . time(); 
-            $this->load->library('upload', $config); 
-
-            if (!$this->upload->do_upload('image')) { 
-                $error = array('error' => $this->upload->display_errors());
-                $this->session->set_flashdata('pesan', '<div class="alert alert-danger alert-message" role="alert">'.$error['error'].'</div>'); 
-                
-                $this->load->view('templates/templates-user/header', $data); 
-                $this->load->view('member/ubah-anggota', $data); 
-                $this->load->view('templates/templates-user/modal'); 
-                $this->load->view('templates/templates-user/footer', $data);
-            } else { 
-                $gambar_lama = $data['user']['image']; 
-                if ($gambar_lama != 'default.jpg') { 
-                unlink(FCPATH . 'assets/img/profile/' . $gambar_lama); 
-                } 
-                $gambar_baru = $this->upload->data('file_name'); 
-                $this->db->set('image', $gambar_baru);   
-            } 
-        } else {
-            $this->db->set('nama', $nama); 
-            $this->db->where('email', $email); 
+            $this->db->set('nama', $nama);
+            $this->db->where('email', $email);
             $this->db->update('user');
-            $this->session->set_flashdata('pesan', '<div class="alert alert-success alert-message" role="alert">Profil Berhasil diubah </div>'); 
-            redirect('member/profile'); 
+
+            $this->session->set_flashdata('pesan', '<div class="alert alert-success alert-message" role="alert">Profil Berhasil diubah</div>');
+            redirect('member/profile');
         }
+    }
+
+
+
+    function logout()
+    {
+        $this->session->unset_userdata('email');
+        $this->session->unset_userdata('role_id');
+        $this->session->set_flashdata('pesan', '<div class="alert alert-success alert-message" role="alert">Anda telah logout!!</div>');
+        redirect('home');
     }
 }
-
-    function logout() 
-        { 
-            $this->session->unset_userdata('email'); 
-            $this->session->unset_userdata('role_id'); 
-            $this->session->set_flashdata('pesan', '<div class="alert alert-success alert-message" role="alert">Anda telah logout!!</div>'); 
-            redirect('home'); 
-        }
-    }
